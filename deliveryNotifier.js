@@ -5,11 +5,13 @@ const cors = require("cors");
 const app = express();
 
 // 🛡️ CORS abierto para tu frontend en Vercel
-app.use(cors({
-  origin: "https://servipro-frontend-9drm.vercel.app",
-  methods: ["GET", "POST"],
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: "https://servipro-frontend-9drm.vercel.app",
+    methods: ["GET", "POST"],
+    credentials: true,
+  })
+);
 
 app.use(express.json());
 
@@ -80,6 +82,11 @@ app.post("/api/presence", (req, res) => {
   let count = 0;
   tokenSockets.forEach((socketSet) => {
     socketSet.forEach((ws) => {
+      console.log("🔍 Socket activo:", {
+        token: ws.token,
+        requestId: ws.requestId,
+        ready: ws.readyState === WebSocket.OPEN,
+      });
       if (ws.readyState === WebSocket.OPEN && ws.requestId === requestId) {
         ws.send(JSON.stringify({ type: "presence", status }));
         count++;
@@ -87,6 +94,8 @@ app.post("/api/presence", (req, res) => {
     });
   });
 
-  console.log(`📡 Presencia emitida a ${count} sockets para requestId: ${requestId}`);
+  console.log(
+    `📡 Presencia emitida a ${count} sockets para requestId: ${requestId}`
+  );
   res.json({ success: true });
 });
