@@ -20,35 +20,50 @@ const server = app.listen(process.env.PORT || 3002, () => {
 
 const wss = new WebSocket.Server({ server });
 
-// 🧠 Mapa de sockets por token
-const tokenSockets = new Map();
+// 🧠 Mapa de sockets por token (permite múltiples conexiones)
+const tokenSockets = new Map(); // Map<string, Set<WebSocket>>
 
 wss.on("connection", (ws, req) => {
   const params = new URLSearchParams(req.url.split("?")[1]);
   const token = params.get("token");
   const requestId = params.get("requestId");
 
-  if (token) {
+  if (token && requestId) {
     ws.token = token;
-    ws.requestId = requestId; // ✅ Asignar requestId al socket
-    tokenSockets.set(token, ws);
-    console.log("🔌 WebSocket conectado con token:", token, "y requestId:", requestId);
+    ws.requestId = requestId;
+
+    if (!tokenSockets.has(token)) {
+      tokenSockets.set(token, new Set());
+    }
+    tokenSockets.get(token).add(ws);
+
+    console.log("🔌 WebSocket conectado:", { token, requestId });
   } else {
-    console.warn("⚠️ WebSocket sin token recibido");
+    console.warn("⚠️ WebSocket sin token o requestId");
   }
 
   ws.on("close", () => {
-    tokenSockets.delete(token);
-    console.log("🔌 WebSocket cerrado para token:", token);
+    const socketSet = tokenSockets.get(ws.token);
+    if (socketSet) {
+      socketSet.delete(ws);
+      if (socketSet.size === 0) {
+        tokenSockets.delete(ws.token);
+      }
+    }
+    console.log("🔌 WebSocket cerrado para token:", ws.token);
   });
 });
 
 // ✅ Emitir evento "entregado"
 app.post("/api/deliver", (req, res) => {
   const { token, messageId } = req.body;
-  const socket = tokenSockets.get(token);
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ type: "entregado", messageId }));
+  const socketSet = tokenSockets.get(token);
+  if (socketSet) {
+    socketSet.forEach((ws) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "entregado", messageId }));
+      }
+    });
     return res.json({ success: true });
   }
   res.status(404).json({ error: "Usuario no conectado" });
@@ -62,12 +77,16 @@ app.post("/api/presence", (req, res) => {
     return res.status(400).json({ error: "Faltan datos" });
   }
 
-  tokenSockets.forEach((ws) => {
-    if (ws.readyState === WebSocket.OPEN && ws.requestId === requestId) {
-      ws.send(JSON.stringify({ type: "presence", status }));
-    }
+  let count = 0;
+  tokenSockets.forEach((socketSet) => {
+    socketSet.forEach((ws) => {
+      if (ws.readyState === WebSocket.OPEN && ws.requestId === requestId) {
+        ws.send(JSON.stringify({ type: "presence", status }));
+        count++;
+      }
+    });
   });
 
+  console.log(`📡 Presencia emitida a ${count} sockets para requestId: ${requestId}`);
   res.json({ success: true });
 });
-
