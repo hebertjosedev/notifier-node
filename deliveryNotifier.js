@@ -24,11 +24,15 @@ const wss = new WebSocket.Server({ server });
 const tokenSockets = new Map();
 
 wss.on("connection", (ws, req) => {
-  const token = new URLSearchParams(req.url.split("?")[1]).get("token");
+  const params = new URLSearchParams(req.url.split("?")[1]);
+  const token = params.get("token");
+  const requestId = params.get("requestId");
 
   if (token) {
+    ws.token = token;
+    ws.requestId = requestId; // ✅ Asignar requestId al socket
     tokenSockets.set(token, ws);
-    console.log("🔌 WebSocket conectado con token:", token); // ✅ LOG CRÍTICO
+    console.log("🔌 WebSocket conectado con token:", token, "y requestId:", requestId);
   } else {
     console.warn("⚠️ WebSocket sin token recibido");
   }
@@ -52,11 +56,18 @@ app.post("/api/deliver", (req, res) => {
 
 // 🟢 Emitir evento de presencia
 app.post("/api/presence", (req, res) => {
-  const { token, status } = req.body;
+  const { token, status, requestId } = req.body;
+
+  if (!requestId || !status) {
+    return res.status(400).json({ error: "Faltan datos" });
+  }
+
   tokenSockets.forEach((ws) => {
-    if (ws.readyState === WebSocket.OPEN) {
+    if (ws.readyState === WebSocket.OPEN && ws.requestId === requestId) {
       ws.send(JSON.stringify({ type: "presence", status }));
     }
   });
+
   res.json({ success: true });
 });
+
