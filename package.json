@@ -1,0 +1,13 @@
+{
+  "name": "notifier-node",
+  "version": "1.0.0",
+  "main": "deliveryNotifier.js",
+  "scripts": {
+    "start": "node deliveryNotifier.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "ws": "^8.18.3"
+  }
+}
