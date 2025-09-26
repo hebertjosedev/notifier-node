@@ -73,29 +73,26 @@ app.post("/api/deliver", (req, res) => {
 
 // 🟢 Emitir evento de presencia
 app.post("/api/presence", (req, res) => {
-  const { token, status, requestId } = req.body;
+  const { token, status } = req.body;
 
-  if (!requestId || !status) {
+  if (!token || !status) {
     return res.status(400).json({ error: "Faltan datos" });
   }
 
+  const socketSet = tokenSockets.get(token);
   let count = 0;
-  tokenSockets.forEach((socketSet) => {
+
+  if (socketSet) {
     socketSet.forEach((ws) => {
-      console.log("🔍 Socket activo:", {
-        token: ws.token,
-        requestId: ws.requestId,
-        ready: ws.readyState === WebSocket.OPEN,
-      });
-      if (ws.readyState === WebSocket.OPEN && ws.requestId === requestId) {
+      if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "presence", status }));
         count++;
       }
     });
-  });
+  }
 
-  console.log(
-    `📡 Presencia emitida a ${count} sockets para requestId: ${requestId}`
-  );
+  console.log(`📡 Presencia emitida a ${count} sockets para token: ${token}`);
   res.json({ success: true });
 });
+
+
