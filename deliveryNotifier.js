@@ -25,10 +25,17 @@ const tokenSockets = new Map();
 
 wss.on("connection", (ws, req) => {
   const token = new URLSearchParams(req.url.split("?")[1]).get("token");
-  if (token) tokenSockets.set(token, ws);
+
+  if (token) {
+    tokenSockets.set(token, ws);
+    console.log("🔌 WebSocket conectado con token:", token); // ✅ LOG CRÍTICO
+  } else {
+    console.warn("⚠️ WebSocket sin token recibido");
+  }
 
   ws.on("close", () => {
     tokenSockets.delete(token);
+    console.log("🔌 WebSocket cerrado para token:", token);
   });
 });
 
